@@ -22,24 +22,32 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-/*		Library Blocks for the Chipset and others	*/
+/*        Library Blocks for the Chipset and others    */
 
-#include <mega32.h>
+#include <mega324.h>
 #define F_CPU 8000000UL // 8Mhz Speed
 #include <delay.h>
+#include <stdbool.h>
 
 
 
 
+/*        Variables | Store Time    */
 
-/*		Variables | Store Time	*/
+int timeH = 1; // H - hour, timeH -> 0 to 23 
+int timeM = 1; // M- minute , timeM -> 0 to 59
+bool timeAM;
 
-int timeH, timeM; // H - hour, M- minute
-int yearV, monthV, dayV, weekV; // weekV = 0 to 6
+int yearV = 2023;
+int leapYearCode = 0;
+int monthV = 1; // monthV -> 1 to 12
+int dayV = 1;
 
 
-int monthMax, weekMax = 12, 7;
+int monthMax = 12;
+int weekMax = 7;
 
+int segP;
 
 
 // Date associated with months
@@ -61,8 +69,7 @@ char monthCode[monthMax] = {
 
 
 
-
-/*		Numbers & Letters | Display	     */
+/*        Numbers & Letters | Display         */
 
 // 16 bit [last bit not used] => 14 segment and extra one for DOT  [1 = active]
 // 0xFC00, 0x6000, 0xD844, 0xF044, 0x6444, 0xB444, 0xBC44, 0xE000, 0xFC44, 0xF444
@@ -103,7 +110,6 @@ char seg_pos[6] = {
 
 
 
-
 /*      Numbers & Letters | Display      */
 
 // DateDisplay Arrays
@@ -125,19 +131,17 @@ char timeDisplay_part2[6] = {
 
 
 
-
 /*      Fuctions         */
 
 // Week Name Value Calculator [range 0 to 6]
 // formula ref: https://artofmemory.com/blog/how-to-calculate-the-day-of-the-week/
 int weekValueFunction() {
     // Year Code
-    int yearVlast2D;
+    int yearVlast2D, yearCode, centuryCode;
     yearVlast2D = yearV%100; // take last two digits
-    int yearCode = (yearVlast2D + (yearVlast2D / 4)) % 7; // year code
+    yearCode = (yearVlast2D + (yearVlast2D / 4)) % 7; // year code
 
     // Century Code
-    int centuryCode;
     if (yearV >= 1700 && yearV < 1800) {
         centuryCode = 4;
     } else if (yearV >= 1800 && yearV < 1900) {
@@ -154,13 +158,6 @@ int weekValueFunction() {
         centuryCode = 0;
     }
 
-    // Leap Year Code
-    int leapYearCode;
-    if (yearV%4 == 0 && (yearV%100 != 0 || yearV%400 == 0)) {
-        leapYearCode = 1;
-    } else {
-        leapYearCode = 0;
-    }
     return (yearCode + monthCode[monthV-1] + centuryCode + dayV - leapYearCode) % 7;
 };
 
@@ -185,13 +182,74 @@ void dateArrangeFunction(char *p1, char *p2) {
     p2[5] = weekName_Small_part2[weekValueFunction()];
 };
 
+// Time Update
+void timeUpdate() {
+    // Increase time
+    timeM += 1;
+
+    // if minute crosses 59
+    if (timeM > 59) {
+        timeM = 0;
+        timeH += 1;
+    }
+    // if hour crosses 23
+    if (timeH > 23) {
+        timeH = 0;
+        dayV += 1;
+    }
+
+    // Leap Year Code
+    if (yearV%400 == 0 && yearV%100 == 0) {
+        leapYearCode = 1;
+    } else if (yearV%4 == 0 &&  yearV%100 != 0) {
+        leapYearCode = 1;
+    } else {
+        leapYearCode = 0;
+    }
+
+    // if day crosses current months last day
+    if (leapYearCode == 1 && monthV == 2) {
+        if (dayV > monthNormal[monthV-1]) {
+            dayV = 0;
+            monthV += 1;
+        }
+    } else {
+        if (dayV > monthLeap[monthV-1]) {
+            dayV = 0;
+            monthV += 1;
+        }
+    }
+    // if month crosses 12
+    if (monthV > 12) {
+        monthV = 0;
+        yearV += 1;
+    }
+};
+
 // Arrange Date for Display
 void timeArrangeFunction(char *p1, char *p2) {
-    p1[0] = num_part1[timeH/10];
-    p2[0] = num_part2[timeH/10];
+    int timeHset;
+    if (timeH >= 12) {
+        timeAM = false;
+        if (timeH > 12) {
+            timeHset = timeH - 12;
+        } else {
+            timeHset = timeH;
+        }
+    } else {
+        timeAM = true;
+        if (timeH == 0) {
+            timeHset = timeH+12;    
+        } else {
+            timeHset = timeH;
+        }
+    }
+
+    p1[0] = num_part1[timeHset/10];
+    p2[0] = num_part2[timeHset/10];
     
-    p1[1] = num_part1[timeH%10];
-    p2[1] = num_part2_dot[timeH%10];
+    p1[1] = num_part1[timeHset%10];
+    p2[1] = num_part2_dot[timeHset%10];
 
     p1[2] = num_part1[timeM/10];
     p2[2] = num_part2[timeM/10];
@@ -199,18 +257,54 @@ void timeArrangeFunction(char *p1, char *p2) {
     p1[3] = num_part1[timeM%10];
     p2[3] = num_part2_dot[timeM%10];
 
-    if (timeH > 11 && timeM >= 59)
-    p1[4] = weekName_Big_part1[];
-    p2[4] = weekName_Big_part2[];
-    
-    p1[5] = weekName_Small_part1[];
-    p2[5] = weekName_Small_part2[];
+    if (timeAM) {
+        // letter A
+        p1[4] = 0xEC;
+        p2[4] = 0x44;
+    } else {
+        // letter P
+        p1[4] = 0xCC;
+        p2[4] = 0x44;
+    }
+    // letter M
+    p1[5] = 0x6E;
+    p2[5] = 0x90;
 };
 
 // Display of all type
 void display(char *p1, char *p2) {
-    for (int segP = 0, segP < 6, segP++) {
+    for (segP = 0; segP < 6; segP++) {
+        // Selecting the Segment to display the value
+        PORTA = seg_pos[segP];
+
         PORTD = p1[segP];
         PORTB = p2[segP];
+        delay_ms(1);
+    }
+};
+
+
+
+
+/*      Main Loop       */
+
+void main(void)
+{
+    // R/W = 0/1 initial -> 0
+    DDRA = 0xFF; // First 6 bit as output
+    DDRB = 0xFF; // First 7 bit as output
+    DDRC = 0x00; // First 4 bit as input
+    DDRD = 0xFF; // All bit as output
+
+    while(1) {
+        if(PINC & (1<<7)) {
+            dateArrangeFunction(dateDisplay_part1, dateDisplay_part2);
+            display(dateDisplay_part1, dateDisplay_part2);
+            timeUpdate();
+        } else {
+            timeUpdate();
+            timeArrangeFunction(timeDisplay_part1, timeDisplay_part2);
+            display(timeDisplay_part1, timeDisplay_part2);
+        }
     }
 };

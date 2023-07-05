@@ -22,7 +22,6 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-
 /*		Library Blocks for the Chipset and others	*/
 
 #include <mega32.h>
@@ -31,11 +30,17 @@ SOFTWARE.
 
 
 
+
+
 /*		Variables | Store Time	*/
 
-// 86400 = 24 hours and 86399 = 23h 59m 59s
-int totalSec, clockTime, stopWatchTime = 86400, 0, 0;
+int timeH, timeM; // H - hour, M- minute
+int yearV, monthV, dayV, weekV; // weekV = 0 to 6
+
+
 int monthMax, weekMax = 12, 7;
+
+
 
 // Date associated with months
 char monthNormal[monthMax] = { // Considering normal year
@@ -53,50 +58,40 @@ char monthCode[monthMax] = {
         // Jan Feb Mar Apr May Jun July Aug Sep Oct Nov Dec        
 };
 
-// WeekCode
-// 0, 1, 2, 3, 4, 5, 6
-// Su, Mo, Tu, We, Th, Fr, Sa
-char weekName_L1_part1[weekMax] = {
-    0xB4, 0x6E, 0x81, 0x6D, 0x81, 0x8C, 0xB4
-    // S, M, T, W, T, F, S
-};
-char weekName_L1_part2[weekMax] = {
-    0x44, 0x90, 0x10, 0x28, 0x10, 0x44, 0x44
-    // S, M, T, W, T, F, S
-};
-char weekName_L2_part1[weekMax] = {
-    0x38, 0x38, 0x38, 0x18, 0x2C, 0x08, 0x18
-    // u, o, u, e, h, r, a
-};
-char weekName_L2_part2[weekMax] = {
-    0x00, 0x44, 0x00, 0x0C, 0x44, 0x44, 0x14
-    // u, o, u, e, h, r, a
-};
 
 
 
-/*		Variables | Display Time	     */
 
-// Arrange the 0 to 86400 time into Hour Min Sec format to display
-char timeArr[6] = {
-        0,	0, 0, 0, 0, 0
-        // H2  H1  M2  M1  S2  S1
-};
+/*		Numbers & Letters | Display	     */
 
-// HEX printing each number => 14 segment Display
 // 16 bit [last bit not used] => 14 segment and extra one for DOT  [1 = active]
 // 0xFC00, 0x6000, 0xD844, 0xF044, 0x6444, 0xB444, 0xBC44, 0xE000, 0xFC44, 0xF444
-
-// part1 ==> PORTD
 char num_part1[10] = {
     0xFC, 0x60, 0xD8, 0xF0, 0x64, 0xB4, 0xBC, 0xE0, 0xFC, 0xF4
 };
-// part2 ==> PORTB
 char num_part2[10] = {
     0x00, 0x00, 0x44, 0x44, 0x44, 0x44, 0x44, 0x00, 0x44, 0x44
 };
 char num_part2_dot[10] = {
     0x02, 0x02, 0x46, 0x46, 0x46, 0x46, 0x46, 0x02, 0x46, 0x46
+};
+
+// WeekCode => 0, 1, 2, 3, 4, 5, 6
+char weekName_Big_part1[weekMax] = {
+    0xB4, 0x6E, 0x81, 0x6D, 0x81, 0x8C, 0xB4
+    // S, M, T, W, T, F, S
+};
+char weekName_Big_part2[weekMax] = {
+    0x44, 0x90, 0x10, 0x28, 0x10, 0x44, 0x44
+    // S, M, T, W, T, F, S
+};
+char weekName_Small_part1[weekMax] = {
+    0x38, 0x38, 0x38, 0x18, 0x2C, 0x08, 0x18
+    // u, o, u, e, h, r, a
+};
+char weekName_Small_part2[weekMax] = {
+    0x00, 0x44, 0x00, 0x0C, 0x44, 0x44, 0x14
+    // u, o, u, e, h, r, a
 };
 
 // Chossing the right segment to display the variable
@@ -107,20 +102,35 @@ char seg_pos[6] = {
 
 
 
-/*      Fuctions         */
 
-// Update the time
-int updateTime(int timeV){
-    if (timeV >= totalSec) {
-        return timeV = 0;
-    }
-    timeV += 1:
-    return timeV;
+
+/*      Numbers & Letters | Display      */
+
+// DateDisplay Arrays
+char dateDisplay_part1[6] = {
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+};
+char dateDisplay_part2[6] = {
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00
 };
 
-// Calculate week name from date
-// ref: https://artofmemory.com/blog/how-to-calculate-the-day-of-the-week/
-int weekName(int yearV, int monthV, int dayV) {
+// TimeDisplay Arrays
+char timeDisplay_part1[6] = {
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+};
+char timeDisplay_part2[6] = {
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+};
+
+
+
+
+
+/*      Fuctions         */
+
+// Week Name Value Calculator [range 0 to 6]
+// formula ref: https://artofmemory.com/blog/how-to-calculate-the-day-of-the-week/
+int weekValueFunction() {
     // Year Code
     int yearVlast2D;
     yearVlast2D = yearV%100; // take last two digits
@@ -151,6 +161,56 @@ int weekName(int yearV, int monthV, int dayV) {
     } else {
         leapYearCode = 0;
     }
-    
     return (yearCode + monthCode[monthV-1] + centuryCode + dayV - leapYearCode) % 7;
+};
+
+// Arrange Date for Display
+void dateArrangeFunction(char *p1, char *p2) {
+    p1[0] = num_part1[dayV/10];
+    p2[0] = num_part2[dayV/10];
+    
+    p1[1] = num_part1[dayV%10];
+    p2[1] = num_part2_dot[dayV%10];
+
+    p1[2] = num_part1[monthV/10];
+    p2[2] = num_part2[monthV/10];
+    
+    p1[3] = num_part1[monthV%10];
+    p2[3] = num_part2_dot[monthV%10];
+
+    p1[4] = weekName_Big_part1[weekValueFunction()];
+    p2[4] = weekName_Big_part2[weekValueFunction()];
+    
+    p1[5] = weekName_Small_part1[weekValueFunction()];
+    p2[5] = weekName_Small_part2[weekValueFunction()];
+};
+
+// Arrange Date for Display
+void timeArrangeFunction(char *p1, char *p2) {
+    p1[0] = num_part1[timeH/10];
+    p2[0] = num_part2[timeH/10];
+    
+    p1[1] = num_part1[timeH%10];
+    p2[1] = num_part2_dot[timeH%10];
+
+    p1[2] = num_part1[timeM/10];
+    p2[2] = num_part2[timeM/10];
+    
+    p1[3] = num_part1[timeM%10];
+    p2[3] = num_part2_dot[timeM%10];
+
+    if (timeH > 11 && timeM >= 59)
+    p1[4] = weekName_Big_part1[];
+    p2[4] = weekName_Big_part2[];
+    
+    p1[5] = weekName_Small_part1[];
+    p2[5] = weekName_Small_part2[];
+};
+
+// Display of all type
+void display(char *p1, char *p2) {
+    for (int segP = 0, segP < 6, segP++) {
+        PORTD = p1[segP];
+        PORTB = p2[segP];
+    }
 };

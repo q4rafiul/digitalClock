@@ -34,19 +34,39 @@ SOFTWARE.
 
 /*        Variables | Store Time    */
 
-int timeH = 1; // H - hour, timeH -> 0 to 23 
-int timeM = 1; // M- minute , timeM -> 0 to 59
+// Time Variables
+int timeArray[3] = {
+    0, 0, 0
+};
 bool timeAM;
+bool timeActive = true;
 
+// Date Variables
 int yearV = 2023;
 int leapYearCode = 0;
 int monthV = 1; // monthV -> 1 to 12
 int dayV = 1;
 
-
 int monthMax = 12;
 int weekMax = 7;
 
+// StopWatch Variables
+int stopWArray[3] = {
+    0, 0, 0
+};
+bool stopWActive = false;
+
+// Button Value
+int buttonArray[4] = {
+    0, 0, 0
+    // Edit State Change
+};
+// State = 0 -> time, 1 -> stopW, 2 -> timer and 3 -> alarm
+// Edit = 0 and 1
+// Change = 0 and 1
+
+
+// Display Variables
 int segP;
 
 
@@ -128,6 +148,14 @@ char timeDisplay_part2[6] = {
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00
 };
 
+// StopWatchDisplay Arrays
+char stopWDisplay_part1[6] = {
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+};
+char stopWDisplay_part2[6] = {
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+};
+
 
 
 
@@ -161,40 +189,47 @@ int weekValueFunction() {
     return (yearCode + monthCode[monthV-1] + centuryCode + dayV - leapYearCode) % 7;
 };
 
-// Arrange Date for Display
-void dateArrangeFunction(char *p1, char *p2) {
-    p1[0] = num_part1[dayV/10];
-    p2[0] = num_part2[dayV/10];
-    
-    p1[1] = num_part1[dayV%10];
-    p2[1] = num_part2_dot[dayV%10];
 
-    p1[2] = num_part1[monthV/10];
-    p2[2] = num_part2[monthV/10];
-    
-    p1[3] = num_part1[monthV%10];
-    p2[3] = num_part2_dot[monthV%10];
-
-    p1[4] = weekName_Big_part1[weekValueFunction()];
-    p2[4] = weekName_Big_part2[weekValueFunction()];
-    
-    p1[5] = weekName_Small_part1[weekValueFunction()];
-    p2[5] = weekName_Small_part2[weekValueFunction()];
-};
-
-// Time Update
-void timeUpdate() {
-    // Increase time
-    timeM += 1;
-
+// Hour, Minute and Second Update
+void hmsUpdate(int *array) {
+    // if second crosses 59
+    if (array[2] > 59) {
+        array[2] = 0;
+        array[1] += 1;
+    }
     // if minute crosses 59
-    if (timeM > 59) {
-        timeM = 0;
-        timeH += 1;
+    if (array[1] > 59) {
+        array[1] = 0;
+        array[0] += 1;
     }
     // if hour crosses 23
-    if (timeH > 23) {
-        timeH = 0;
+    if (array[1] > 23) {
+        array[1] = 0;
+    }
+    
+    // For just switching case
+    // hour reverses
+    if (array[0] < 0) {
+        array[0] = 23;
+    }
+    // second reverses
+    if (array[2] < 0) {
+        array[2] = 59;
+    }
+    // second reverses
+    if (array[1] < 0) {
+        array[1] = 59;
+    }
+};
+
+
+// Time Update
+void timeUpdate() {        
+    hmsUpdate(timeArray);
+
+    // if hour crosses 23
+    if (timeArray[0] > 23) {
+        timeArray[0] = 0;
         dayV += 1;
     }
 
@@ -226,22 +261,23 @@ void timeUpdate() {
     }
 };
 
+
 // Arrange Date for Display
 void timeArrangeFunction(char *p1, char *p2) {
     int timeHset;
-    if (timeH >= 12) {
+    if (timeArray[0] >= 12) {
         timeAM = false;
-        if (timeH > 12) {
-            timeHset = timeH - 12;
+        if (timeArray[0] > 12) {
+            timeHset = timeArray[0] - 12;
         } else {
-            timeHset = timeH;
+            timeHset = timeArray[0];
         }
     } else {
         timeAM = true;
-        if (timeH == 0) {
-            timeHset = timeH+12;    
+        if (timeArray[0] == 0) {
+            timeHset = timeArray[0]+12;    
         } else {
-            timeHset = timeH;
+            timeHset = timeArray[0];
         }
     }
 
@@ -251,11 +287,11 @@ void timeArrangeFunction(char *p1, char *p2) {
     p1[1] = num_part1[timeHset%10];
     p2[1] = num_part2_dot[timeHset%10];
 
-    p1[2] = num_part1[timeM/10];
-    p2[2] = num_part2[timeM/10];
+    p1[2] = num_part1[timeArray[1]/10];
+    p2[2] = num_part2[timeArray[1]/10];
     
-    p1[3] = num_part1[timeM%10];
-    p2[3] = num_part2_dot[timeM%10];
+    p1[3] = num_part1[timeArray[1]%10];
+    p2[3] = num_part2_dot[timeArray[1]%10];
 
     if (timeAM) {
         // letter A
@@ -271,6 +307,51 @@ void timeArrangeFunction(char *p1, char *p2) {
     p2[5] = 0x90;
 };
 
+
+// Arrange Date for Display
+void dateArrangeFunction(char *p1, char *p2) {
+    p1[0] = num_part1[dayV/10];
+    p2[0] = num_part2[dayV/10];
+    
+    p1[1] = num_part1[dayV%10];
+    p2[1] = num_part2_dot[dayV%10];
+
+    p1[2] = num_part1[monthV/10];
+    p2[2] = num_part2[monthV/10];
+    
+    p1[3] = num_part1[monthV%10];
+    p2[3] = num_part2_dot[monthV%10];
+
+    p1[4] = weekName_Big_part1[weekValueFunction()];
+    p2[4] = weekName_Big_part2[weekValueFunction()];
+    
+    p1[5] = weekName_Small_part1[weekValueFunction()];
+    p2[5] = weekName_Small_part2[weekValueFunction()];
+};
+
+
+// Arrange Date for Display
+void stopWArrangeFunction(char *p1, char *p2) {
+    p1[0] = num_part1[stopWArray[0]/10];
+    p2[0] = num_part2[stopWArray[0]/10];
+    
+    p1[1] = num_part1[stopWArray[0]%10];
+    p2[1] = num_part2_dot[stopWArray[0]%10];
+
+    p1[2] = num_part1[stopWArray[1]/10];
+    p2[2] = num_part2[stopWArray[1]/10];
+    
+    p1[3] = num_part1[stopWArray[1]%10];
+    p2[3] = num_part2_dot[stopWArray[1]%10];
+
+    p1[4] = num_part1[stopWArray[2]/10];
+    p2[4] = num_part2[stopWArray[2]/10];
+    
+    p1[5] = num_part1[stopWArray[2]%10];
+    p2[5] = num_part2[stopWArray[2]%10];
+};
+
+
 // Display of all type
 void display(char *p1, char *p2) {
     for (segP = 0; segP < 6; segP++) {
@@ -279,7 +360,7 @@ void display(char *p1, char *p2) {
 
         PORTD = p1[segP];
         PORTB = p2[segP];
-        delay_ms(1);
+        delay_ms(3);
     }
 };
 
@@ -297,14 +378,115 @@ void main(void)
     DDRD = 0xFF; // All bit as output
 
     while(1) {
-        if(PINC & (1<<7)) {
-            dateArrangeFunction(dateDisplay_part1, dateDisplay_part2);
-            display(dateDisplay_part1, dateDisplay_part2);
+        /* Action Buttons */
+        
+        // CHANGE Button
+        if ((PINC & (1<<4)) && !(buttonArray[1] == 0 && buttonArray[0] == 0)) {
+            buttonArray[2] += 1;
+            if (buttonArray[2] > 1) {
+                buttonArray[2] = 0;
+            }
+        }
+        // EDIT Button
+        if (PINC & (1<<7)) {
+            buttonArray[0] += 1;
+            if (buttonArray[0] > 1) {
+                buttonArray[0] = 0;
+            }
+        }
+        // UP Button
+        if (buttonArray[0] ==0 && (PINC & (1<<6))) {
+            buttonArray[1] += 1;
+            buttonArray[0] = 0; // reset edit button value to 0
+            buttonArray[2] = 0; // reset change button value to 0
+        }
+        // DOWN Button
+        if (buttonArray[0] ==0 && (PINC & (1<<5))) {
+            buttonArray[1] -= 1;
+            buttonArray[0] = 0; // reset edit button value to 0
+            buttonArray[2] = 0; // reset change button value to 0
+        }
+        if (buttonArray[1] > 3) {
+            buttonArray[1] = 0;
+        } else if (buttonArray[1] < 0) {
+            buttonArray[1] = 3;
+        }
+
+
+        /* Conditions */
+        // Always update time just off when it's in edit mode
+        if (timeActive) {
+            timeArray[1] += 1;
             timeUpdate();
-        } else {
-            timeUpdate();
+        }
+
+
+        /* Features */
+
+        // Time's Feature
+        if (buttonArray[1] == 0 && buttonArray[0] == 0) {
+            timeActive = true;
+
+            if (PINC & (1<<4)) {
+                dateArrangeFunction(dateDisplay_part1, dateDisplay_part2);
+                display(dateDisplay_part1, dateDisplay_part2);
+            } else {
+                timeArrangeFunction(timeDisplay_part1, timeDisplay_part2);
+                display(timeDisplay_part1, timeDisplay_part2);
+            }
+        } else if (buttonArray[1] == 0 && buttonArray[0] == 1) {
+            timeActive = false;
+
+            // minute change
+            if (buttonArray[2] == 0) {
+                if (PINC & (1<<6)) {
+                    timeArray[1] += 1;
+                }
+                if (PINC & (1<<5)) {
+                    timeArray[1] -= 1;
+                }
+            }
+            // hour change
+            if (buttonArray[2] == 1) {
+                if (PINC & (1<<6)) {
+                    timeArray[0] += 1;
+                }
+                if (PINC & (1<<5)) {
+                    timeArray[0] -= 1;
+                }
+            }
+            hmsUpdate(timeArray);
             timeArrangeFunction(timeDisplay_part1, timeDisplay_part2);
             display(timeDisplay_part1, timeDisplay_part2);
+        }
+
+
+        // StopWatch Feature
+        if (buttonArray[1] == 1) {
+            // Start and Stop
+            if (buttonArray[2] == 0) {
+                stopWActive = false;
+            } else if (buttonArray[2] == 1) {
+                stopWActive = true;
+            }
+
+            // Reset
+            if (buttonArray[0] == 1) {
+                stopWActive = false;
+                stopWArray[0] = 0;
+                stopWArray[1] = 0;
+                stopWArray[2] = 0;
+            }
+
+            if (stopWActive) {
+                stopWArray[2] += 1;
+                hmsUpdate(stopWArray);
+                stopWArrangeFunction(stopWDisplay_part1, stopWDisplay_part2);
+                display(stopWDisplay_part1, stopWDisplay_part2);
+            } else {
+                stopWArrangeFunction(stopWDisplay_part1, stopWDisplay_part2);
+                display(stopWDisplay_part1, stopWDisplay_part2);
+            }
         }
     }
 };
